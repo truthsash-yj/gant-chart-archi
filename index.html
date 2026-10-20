@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로젝트 일정 간트 차트 (Gantt Chart Dashboard)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .gantt-grid {
+            background-size: 40px 100%;
+            background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px);
+        }
+        .dark .gantt-grid {
+            background-image: linear-gradient(to right, #334155 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen font-sans transition-colors duration-200">
+
+    <!-- Top Header -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-[1700px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-blue-600 text-white rounded-lg shadow-md">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                        재개발/정비사업 프로젝트 간트 차트
+                        <span class="text-xs font-semibold px-2.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 rounded-full">v2.1</span>
+                    </h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">일정 관리 및 마일스톤 커스텀 대시보드</p>
+                </div>
+            </div>
+
+            <!-- Header Controls -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Search -->
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="searchInput" placeholder="작업명 검색..." class="pl-9 pr-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-44">
+                </div>
+
+                <!-- View Mode Buttons -->
+                <div class="bg-slate-100 dark:bg-slate-700 p-1 rounded-lg flex items-center gap-1 text-xs font-medium border border-slate-200 dark:border-slate-600">
+                    <button onclick="setViewMode('daily')" id="btn-daily" class="px-2.5 py-1 rounded-md transition-colors hover:bg-white dark:hover:bg-slate-600">일간</button>
+                    <button onclick="setViewMode('weekly')" id="btn-weekly" class="px-2.5 py-1 rounded-md bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400 font-semibold">주간</button>
+                    <button onclick="setViewMode('monthly')" id="btn-monthly" class="px-2.5 py-1 rounded-md transition-colors hover:bg-white dark:hover:bg-slate-600">월간</button>
+                </div>
+
+                <!-- Action Buttons -->
+                <button onclick="openAddTaskModal()" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm transition-all">
+                    <i data-lucide="plus" class="w-4 h-4"></i> 작업 추가
+                </button>
+                
+                <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                <button onclick="exportJSON()" title="데이터 내보내기" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+                <button onclick="toggleDarkMode()" title="다크모드 전환" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-[1700px] mx-auto px-4 py-4 space-y-4">
+
+        <!-- KPI Cards -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">총 공정 수</div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-total" class="text-2xl font-extrabold text-slate-900 dark:text-white">0</span>
+                    <span class="text-xs text-slate-400">개 항목</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">완료 항목 (100%)</div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-completed" class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">0</span>
+                    <span id="kpi-completed-pct" class="text-xs text-emerald-500 font-medium">0%</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">진행중 항목</div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-in-progress" class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">0</span>
+                    <span id="kpi-avg-progress" class="text-xs text-blue-500 font-medium">평균 0%</span>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">단일 마일스톤</div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-milestones" class="text-2xl font-extrabold text-purple-600 dark:text-purple-400">0</span>
+                    <span class="text-xs text-slate-400">주요 지정일</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gantt View Layout -->
+        <section class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+            <!-- Table Toolbar -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs text-slate-500">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span> 일반 작업
+                    <span class="inline-block w-3 h-3 bg-purple-500 rotate-45 rounded-xs ml-3"></span> 주요 마일스톤
+                </div>
+                <div>🎨 <strong>색상 커스텀:</strong> 각 태스크 오른쪽 팔레트 아이콘 클릭</div>
+            </div>
+
+            <div class="overflow-x-auto flex-1 relative" id="ganttScrollContainer">
+                <div id="ganttWrapper" class="inline-block min-w-full align-middle">
+                    
+                    <!-- Gantt Header -->
+                    <div class="flex sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        <!-- Left Panel Column Header -->
+                        <div class="w-[420px] flex-none flex items-center px-4 py-2.5 bg-slate-100 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 sticky left-0 z-30 shadow-md">
+                            <div class="w-1/2">태스크명</div>
+                            <div class="w-1/4 text-center">시작 / 종료</div>
+                            <div class="w-1/8 text-center">일수</div>
+                            <div class="w-1/8 text-center">진척도</div>
+                        </div>
+                        
+                        <!-- Timeline Header Columns -->
+                        <div id="timelineHeader" class="flex-1 flex min-w-max">
+                            <!-- JS Dynamically Injected Header -->
+                        </div>
+                    </div>
+
+                    <!-- Gantt Body Rows -->
+                    <div id="ganttRows" class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                        <!-- JS Injected Task Rows -->
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Edit / Add Modal -->
+    <div id="taskModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+            <h3 id="modalTitle" class="text-lg font-bold text-slate-900 dark:text-white">태스크 수정</h3>
+            
+            <form id="taskForm" onsubmit="saveTask(event)" class="space-y-3">
+                <input type="hidden" id="taskId">
+                
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">작업 명칭</label>
+                    <input type="text" id="taskName" required class="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">시작일</label>
+                        <input type="date" id="taskStart" required onchange="calculateDays()" class="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">종료일</label>
+                        <input type="date" id="taskEnd" required onchange="calculateDays()" class="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">소요일수</label>
+                        <input type="number" id="taskDays" readonly class="w-full px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">진척율 (0 ~ 100%)</label>
+                        <input type="number" id="taskProgress" min="0" max="100" required class="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                    </div>
+                </div>
+
+                <!-- Color Palette Selection -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">태스크 바 색상</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="taskColor" class="w-10 h-8 p-0.5 rounded cursor-pointer border border-slate-300 dark:border-slate-600">
+                        <!-- Preset Color Chips -->
+                        <div class="flex gap-1.5">
+                            <button type="button" onclick="setPresetColor('#3b82f6')" class="w-6 h-6 rounded-full bg-blue-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                            <button type="button" onclick="setPresetColor('#10b981')" class="w-6 h-6 rounded-full bg-emerald-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                            <button type="button" onclick="setPresetColor('#8b5cf6')" class="w-6 h-6 rounded-full bg-purple-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                            <button type="button" onclick="setPresetColor('#f59e0b')" class="w-6 h-6 rounded-full bg-amber-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                            <button type="button" onclick="setPresetColor('#ef4444')" class="w-6 h-6 rounded-full bg-rose-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                            <button type="button" onclick="setPresetColor('#14b8a6')" class="w-6 h-6 rounded-full bg-teal-500 ring-2 ring-offset-1 ring-transparent hover:ring-slate-400"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <button type="button" onclick="deleteTask()" id="btnDelete" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-semibold rounded-lg transition-colors">삭제</button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeModal()" class="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">취소</button>
+                        <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">저장</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // Initial Dataset parsed from Gantt_Chart_Final-r.xlsx
+        const initialTasks = [
+            { id: 1, name: "주요일정", start: "2025-12-08", end: "2027-04-30", days: 509, progress: 60, color: "#2563eb" },
+            { id: 2, name: "도계위 심의 및 재공람", start: "2025-12-08", end: "2026-06-04", days: 179, progress: 100, color: "#0284c7" },
+            { id: 3, name: "제2차 신속통합계획 자문결과", start: "2025-12-08", end: "2025-12-08", days: 1, progress: 75, color: "#8b5cf6" },
+            { id: 4, name: "38-1 정비시계획변경고시", start: "2026-06-04", end: "2026-06-04", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 5, name: "시공사 선정준비", start: "2025-12-08", end: "2026-06-19", days: 194, progress: 100, color: "#0284c7" },
+            { id: 6, name: "시공사 선정공고", start: "2026-06-19", end: "2026-06-19", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 7, name: "시공사 선정", start: "2026-06-19", end: "2026-10-31", days: 135, progress: 80, color: "#0284c7" },
+            { id: 8, name: "재입찰 공고", start: "2026-07-03", end: "2026-07-03", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 9, name: "우선협상대상자선정", start: "2026-07-20", end: "2026-07-20", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 10, name: "조합총회-시공사선정", start: "2026-09-19", end: "2026-09-19", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 11, name: "영향평가 및 건축통합심의", start: "2026-09-20", end: "2027-04-30", days: 223, progress: 10, color: "#0284c7" },
+            { id: 12, name: "건축", start: "2025-11-29", end: "2026-09-19", days: 295, progress: 39, color: "#10b981" },
+            { id: 13, name: "시공사 선정용 도서", start: "2025-11-29", end: "2026-04-07", days: 130, progress: 100, color: "#10b981" },
+            { id: 14, name: "시공사 선정도서 조합 납품", start: "2026-04-07", end: "2026-04-07", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 15, name: "디자인디벨롭", start: "2026-04-07", end: "2026-09-20", days: 167, progress: 100, color: "#10b981" },
+            { id: 16, name: "조합 디자인보고", start: "2026-04-14", end: "2026-04-14", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 17, name: "조합 입면 보고", start: "2026-06-24", end: "2026-06-24", days: 1, progress: 100, color: "#8b5cf6" },
+            { id: 18, name: "대안설계 협업", start: "2026-04-24", end: "2026-07-30", days: 98, progress: 100, color: "#10b981" },
+            { id: 19, name: "대안설계 반영 및 심의도서 준비", start: "2026-09-21", end: "2026-12-24", days: 95, progress: 10, color: "#10b981" }
+        ];
+
+        let tasks = [...initialTasks];
+        let viewMode = 'weekly'; // 'daily', 'weekly', 'monthly'
+        let columnWidth = 45; // Width in px for each unit
+
+        // Global Date Bounds (Calculated dynamically)
+        let minDate, maxDate, totalDays;
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            render();
+
+            document.getElementById('searchInput').addEventListener('input', render);
+        });
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            document.querySelectorAll('[id^="btn-"]').forEach(btn => {
+                btn.className = "px-2.5 py-1 rounded-md transition-colors hover:bg-white dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200";
+            });
+            const activeBtn = document.getElementById(`btn-${mode}`);
+            activeBtn.className = "px-2.5 py-1 rounded-md bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400 font-semibold";
+            
+            columnWidth = mode === 'daily' ? 32 : (mode === 'weekly' ? 45 : 70);
+            render();
+        }
+
+        function calculateBounds() {
+            if (tasks.length === 0) {
+                minDate = new Date();
+                maxDate = new Date();
+                maxDate.setDate(maxDate.getDate() + 30);
+                return;
+            }
+            let starts = tasks.map(t => new Date(t.start));
+            let ends = tasks.map(t => new Date(t.end));
+
+            minDate = new Date(Math.min(...starts));
+            maxDate = new Date(Math.max(...ends));
+
+            // Buffer margins
+            minDate.setDate(minDate.getDate() - 7);
+            maxDate.setDate(maxDate.getDate() + 14);
+
+            totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
+        }
+
+        function render() {
+            calculateBounds();
+            renderKPIs();
+            renderTimelineHeader();
+            renderGanttRows();
+            lucide.createIcons();
+        }
+
+        function renderKPIs() {
+            const filtered = getFilteredTasks();
+            const completed = filtered.filter(t => t.progress === 100).length;
+            const milestones = filtered.filter(t => t.start === t.end).length;
+            const avgProgress = filtered.length ? Math.round(filtered.reduce((acc, t) => acc + t.progress, 0) / filtered.length) : 0;
+
+            document.getElementById('kpi-total').innerText = filtered.length;
+            document.getElementById('kpi-completed').innerText = completed;
+            document.getElementById('kpi-completed-pct').innerText = filtered.length ? `${Math.round((completed/filtered.length)*100)}%` : '0%';
+            document.getElementById('kpi-in-progress').innerText = filtered.length - completed;
+            document.getElementById('kpi-avg-progress').innerText = `평균 ${avgProgress}%`;
+            document.getElementById('kpi-milestones').innerText = milestones;
+        }
+
+        function getFilteredTasks() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            return tasks.filter(t => t.name.toLowerCase().includes(query));
+        }
+
+        function renderTimelineHeader() {
+            const headerContainer = document.getElementById('timelineHeader');
+            headerContainer.innerHTML = '';
+
+            let curr = new Date(minDate);
+
+            if (viewMode === 'daily') {
+                for (let i = 0; i < totalDays; i++) {
+                    const col = document.createElement('div');
+                    col.style.width = `${columnWidth}px`;
+                    col.className = 'flex-none border-r border-slate-200 dark:border-slate-700 text-center py-1.5 flex flex-col justify-center';
+                    const dayStr = curr.getDate();
+                    const monthStr = curr.getMonth() + 1;
+                    col.innerHTML = `<span class="text-[10px] text-slate-400">${monthStr}/${dayStr}</span><span class="font-bold text-[11px]">${dayStr}</span>`;
+                    headerContainer.appendChild(col);
+                    curr.setDate(curr.getDate() + 1);
+                }
+            } else if (viewMode === 'weekly') {
+                let totalWeeks = Math.ceil(totalDays / 7);
+                for (let w = 0; w < totalWeeks; w++) {
+                    const col = document.createElement('div');
+                    col.style.width = `${columnWidth}px`;
+                    col.className = 'flex-none border-r border-slate-200 dark:border-slate-700 text-center py-1.5 flex flex-col justify-center';
+                    const m = curr.getMonth() + 1;
+                    const d = curr.getDate();
+                    col.innerHTML = `<span class="text-[10px] text-slate-400">${curr.getFullYear().toString().substring(2)}년</span><span class="font-bold text-[11px]">${m}/${d}~</span>`;
+                    headerContainer.appendChild(col);
+                    curr.setDate(curr.getDate() + 7);
+                }
+            } else if (viewMode === 'monthly') {
+                let tempMin = new Date(minDate);
+                let tempMax = new Date(maxDate);
+                
+                while (tempMin <= tempMax) {
+                    const col = document.createElement('div');
+                    col.style.width = `${columnWidth}px`;
+                    col.className = 'flex-none border-r border-slate-200 dark:border-slate-700 text-center py-2 flex flex-col justify-center';
+                    col.innerHTML = `<span class="font-bold text-[11px]">${tempMin.getFullYear()}.${String(tempMin.getMonth() + 1).padStart(2, '0')}</span>`;
+                    headerContainer.appendChild(col);
+                    tempMin.setMonth(tempMin.getMonth() + 1);
+                }
+            }
+        }
+
+        function renderGanttRows() {
+            const rowsContainer = document.getElementById('ganttRows');
+            rowsContainer.innerHTML = '';
+            const filteredTasks = getFilteredTasks();
+
+            filteredTasks.forEach(task => {
+                const isMilestone = task.start === task.end;
+                const row = document.createElement('div');
+                row.className = 'flex hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors group text-xs';
+
+                // Format dates for milestone text (MM/DD) and (MM월/DD일)
+                const sDate = new Date(task.start);
+                const monthDayStr = `${String(sDate.getMonth() + 1).padStart(2, '0')}/${String(sDate.getDate()).padStart(2, '0')}`;
+                const monthDayKorean = `(${String(sDate.getMonth() + 1).padStart(2, '0')}월/${String(sDate.getDate()).padStart(2, '0')}일)`;
+
+                // Left Panel Row Item
+                const leftPanel = `
+                    <div class="w-[420px] flex-none flex items-center px-4 py-2.5 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 sticky left-0 z-10 shadow-sm">
+                        <div class="w-1/2 font-semibold text-slate-800 dark:text-slate-100 flex items-center justify-between pr-2">
+                            <span class="truncate" title="${task.name}">${task.name}</span>
+                            <!-- Custom Color Picker Icon -->
+                            <input type="color" value="${task.color || '#0284c7'}" onchange="updateTaskColor(${task.id}, this.value)" title="색상 변경" class="w-4 h-4 p-0 border-0 rounded cursor-pointer opacity-70 group-hover:opacity-100">
+                        </div>
+                        <div class="w-1/4 text-center text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            ${isMilestone ? monthDayStr : `${task.start.substring(5)}`}
+                        </div>
+                        <div class="w-1/8 text-center font-mono text-slate-600 dark:text-slate-300">
+                            ${task.days}일
+                        </div>
+                        <div class="w-1/8 text-center flex items-center justify-center gap-1">
+                            <span class="font-bold ${task.progress === 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}">${task.progress}%</span>
+                            <button onclick="openEditTaskModal(${task.id})" class="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Calculate Position for Timeline
+                const startDate = new Date(task.start);
+                const endDate = new Date(task.end);
+                
+                let offsetDays = (startDate - minDate) / (1000 * 60 * 60 * 24);
+                let durationDays = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24) + 1);
+
+                let leftPx = 0;
+                let widthPx = 0;
+
+                if (viewMode === 'daily') {
+                    leftPx = offsetDays * columnWidth;
+                    widthPx = durationDays * columnWidth;
+                } else if (viewMode === 'weekly') {
+                    leftPx = (offsetDays / 7) * columnWidth;
+                    widthPx = Math.max(20, (durationDays / 7) * columnWidth);
+                } else if (viewMode === 'monthly') {
+                    leftPx = (offsetDays / 30.4) * columnWidth;
+                    widthPx = Math.max(20, (durationDays / 30.4) * columnWidth);
+                }
+
+                const barColor = task.color || (isMilestone ? '#8b5cf6' : '#0284c7');
+
+                // Right Timeline Cell
+                let timelineBar = '';
+                if (isMilestone) {
+                    timelineBar = `
+                        <div style="left: ${leftPx}px;" class="absolute flex items-center gap-1.5 z-10 top-1/2 -translate-y-1/2">
+                            <div style="background-color: ${barColor};" class="w-4 h-4 rotate-45 rounded-xs shadow-md border border-white dark:border-slate-800 flex-none"></div>
+                            <span class="text-[11px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap bg-white/80 dark:bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-xs">
+                                ◆ ${task.name} <span class="text-purple-600 dark:text-purple-400 font-mono ml-0.5">${monthDayKorean}</span>
+                            </span>
+                        </div>
+                    `;
+                } else {
+                    timelineBar = `
+                        <div style="left: ${leftPx}px; width: ${widthPx}px; background-color: ${barColor}20; border-color: ${barColor};" 
+                             class="absolute h-6 top-1/2 -translate-y-1/2 rounded-md border shadow-xs overflow-hidden flex items-center px-2 group/bar">
+                            <!-- Progress Fill -->
+                            <div style="width: ${task.progress}%; background-color: ${barColor};" class="absolute left-0 top-0 bottom-0 opacity-80 transition-all"></div>
+                            <span class="relative z-10 text-[10px] font-bold text-slate-900 dark:text-white drop-shadow-xs truncate">
+                                ${task.name} (${task.progress}%)
+                            </span>
+                        </div>
+                    `;
+                }
+
+                const rightPanel = `
+                    <div class="flex-1 relative min-h-[40px] gantt-grid flex items-center">
+                        ${timelineBar}
+                    </div>
+                `;
+
+                row.innerHTML = leftPanel + rightPanel;
+                rowsContainer.appendChild(row);
+            });
+        }
+
+        // Color Picker Direct Change
+        function updateTaskColor(id, color) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.color = color;
+                render();
+            }
+        }
+
+        // Modal Operations
+        function openAddTaskModal() {
+            document.getElementById('modalTitle').innerText = '새 작업 추가';
+            document.getElementById('taskId').value = '';
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskStart').value = new Date().toISOString().substring(0, 10);
+            document.getElementById('taskEnd').value = new Date().toISOString().substring(0, 10);
+            document.getElementById('taskDays').value = 1;
+            document.getElementById('taskProgress').value = 0;
+            document.getElementById('taskColor').value = '#0284c7';
+            document.getElementById('btnDelete').classList.add('hidden');
+            
+            document.getElementById('taskModal').classList.remove('hidden');
+        }
+
+        function openEditTaskModal(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+
+            document.getElementById('modalTitle').innerText = '태스크 수정';
+            document.getElementById('taskId').value = task.id;
+            document.getElementById('taskName').value = task.name;
+            document.getElementById('taskStart').value = task.start;
+            document.getElementById('taskEnd').value = task.end;
+            document.getElementById('taskDays').value = task.days;
+            document.getElementById('taskProgress').value = task.progress;
+            document.getElementById('taskColor').value = task.color || '#0284c7';
+            document.getElementById('btnDelete').classList.remove('hidden');
+
+            document.getElementById('taskModal').classList.remove('hidden');
+        }
+
+        function setPresetColor(hex) {
+            document.getElementById('taskColor').value = hex;
+        }
+
+        function closeModal() {
+            document.getElementById('taskModal').classList.add('hidden');
+        }
+
+        function calculateDays() {
+            const start = new Date(document.getElementById('taskStart').value);
+            const end = new Date(document.getElementById('taskEnd').value);
+            if (start && end && end >= start) {
+                const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                document.getElementById('taskDays').value = diff;
+            } else {
+                document.getElementById('taskDays').value = 1;
+            }
+        }
+
+        function saveTask(e) {
+            e.preventDefault();
+            const id = document.getElementById('taskId').value;
+            const name = document.getElementById('taskName').value;
+            const start = document.getElementById('taskStart').value;
+            const end = document.getElementById('taskEnd').value;
+            const days = parseInt(document.getElementById('taskDays').value) || 1;
+            const progress = parseInt(document.getElementById('taskProgress').value) || 0;
+            const color = document.getElementById('taskColor').value;
+
+            if (id) {
+                // Edit
+                const task = tasks.find(t => t.id === parseInt(id));
+                if (task) {
+                    task.name = name;
+                    task.start = start;
+                    task.end = end;
+                    task.days = days;
+                    task.progress = progress;
+                    task.color = color;
+                }
+            } else {
+                // Add
+                const newId = tasks.length ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
+                tasks.push({ id: newId, name, start, end, days, progress, color });
+            }
+
+            closeModal();
+            render();
+        }
+
+        function deleteTask() {
+            const id = parseInt(document.getElementById('taskId').value);
+            if (id && confirm('정말 이 작업을 삭제하시겠습니까?')) {
+                tasks = tasks.filter(t => t.id !== id);
+                closeModal();
+                render();
+            }
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tasks, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "gantt_tasks.json");
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+    </script>
+</body>
+</html>
